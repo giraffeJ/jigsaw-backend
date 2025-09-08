@@ -58,7 +58,35 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     if existing_phone:
         raise ValueError("이미 등록된 전화번호입니다.")
 
-    db_user = models.User(**user.dict())
+    # normalize enum-like fields so SQLAlchemy Enum columns receive enum members
+    data = user.dict()
+    try:
+        if "education_level" in data and data["education_level"] is not None:
+            data["education_level"] = models.EducationLevel(data["education_level"])
+    except Exception:
+        pass
+    try:
+        if "religion" in data and data["religion"] is not None:
+            data["religion"] = models.Religion(data["religion"])
+    except Exception:
+        pass
+    try:
+        if "smoking_status" in data and data["smoking_status"] is not None:
+            data["smoking_status"] = models.SmokingStatus(data["smoking_status"])
+    except Exception:
+        pass
+    try:
+        if "workplace_matching" in data and data["workplace_matching"] is not None:
+            data["workplace_matching"] = models.WorkplaceMatching(data["workplace_matching"])
+    except Exception:
+        pass
+    try:
+        if "preferred_smoking" in data and data["preferred_smoking"] is not None:
+            data["preferred_smoking"] = models.SmokingStatus(data["preferred_smoking"])
+    except Exception:
+        pass
+
+    db_user = models.User(**data)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -69,6 +97,39 @@ def update_user(db: Session, user_id: int, user: schemas.UserUpdate) -> Optional
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user:
         update_data = user.dict(exclude_unset=True)
+        # normalize enum-like fields before applying
+        if "education_level" in update_data and update_data["education_level"] is not None:
+            try:
+                update_data["education_level"] = models.EducationLevel(
+                    update_data["education_level"]
+                )
+            except Exception:
+                pass
+        if "religion" in update_data and update_data["religion"] is not None:
+            try:
+                update_data["religion"] = models.Religion(update_data["religion"])
+            except Exception:
+                pass
+        if "smoking_status" in update_data and update_data["smoking_status"] is not None:
+            try:
+                update_data["smoking_status"] = models.SmokingStatus(update_data["smoking_status"])
+            except Exception:
+                pass
+        if "workplace_matching" in update_data and update_data["workplace_matching"] is not None:
+            try:
+                update_data["workplace_matching"] = models.WorkplaceMatching(
+                    update_data["workplace_matching"]
+                )
+            except Exception:
+                pass
+        if "preferred_smoking" in update_data and update_data["preferred_smoking"] is not None:
+            try:
+                update_data["preferred_smoking"] = models.SmokingStatus(
+                    update_data["preferred_smoking"]
+                )
+            except Exception:
+                pass
+
         for field, value in update_data.items():
             setattr(db_user, field, value)
         db.commit()
@@ -245,3 +306,38 @@ def get_presented_counts(db: Session) -> Dict[int, int]:
         .all()
     )
     return {r[0]: r[1] for r in rows}
+
+
+def get_presented_counts_by_candidate(db: Session) -> Dict[int, int]:
+    """candidate_id 기준으로 제안 횟수 집계"""
+    rows = (
+        db.query(models.Presentation.candidate_id, func.count(models.Presentation.id))
+        .group_by(models.Presentation.candidate_id)
+        .all()
+    )
+    return {cid: cnt for cid, cnt in rows}
+
+
+def get_last_presented_at_by_candidate(db: Session) -> Dict[int, datetime]:
+    """candidate_id 별 마지막 presented_at 타임스탬프 조회"""
+    rows = (
+        db.query(models.Presentation.candidate_id, func.max(models.Presentation.presented_at))
+        .group_by(models.Presentation.candidate_id)
+        .all()
+    )
+    return {cid: ts for cid, ts in rows}
+
+
+def list_recent_presented_candidate_ids(
+    db: Session, requester_id: int, since_dt: datetime
+) -> set[int]:
+    """주어진 requester에게 since_dt 이후에 제안된 candidate_id 집합 반환"""
+    rows = (
+        db.query(models.Presentation.candidate_id)
+        .filter(
+            models.Presentation.requester_id == requester_id,
+            models.Presentation.presented_at >= since_dt,
+        )
+        .all()
+    )
+    return {cid for (cid,) in rows}
