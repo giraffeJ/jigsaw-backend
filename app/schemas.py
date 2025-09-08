@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -123,6 +123,82 @@ class User(UserBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Templates schemas ---
+class TemplateBase(BaseModel):
+    key: str
+    version: int = 1
+    locale: str = "ko"
+    content: str
+    is_active: bool = True
+
+
+class TemplateCreate(TemplateBase):
+    pass
+
+
+class TemplateUpdate(BaseModel):
+    key: Optional[str] = None
+    version: Optional[int] = None
+    locale: Optional[str] = None
+    content: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class Template(TemplateBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- MatchPlan schemas ---
+class MatchPlanBase(BaseModel):
+    created_by: str
+    notes: Optional[str] = None
+
+
+class MatchPlanCreate(MatchPlanBase):
+    pass
+
+
+class MatchPlan(MatchPlanBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Presentations schemas ---
+class PresentationBase(BaseModel):
+    requester_id: int
+    candidate_id: int
+    plan_id: Optional[int] = None
+    template_key: Optional[str] = None
+    template_version: Optional[int] = None
+    rendered_message: Optional[str] = None
+
+
+class PresentationCreate(PresentationBase):
+    pass
+
+
+class PresentationDecision(BaseModel):
+    outcome: Literal["accepted", "declined"]
+
+
+class Presentation(PresentationBase):
+    id: int
+    outcome: str = "pending"
+    presented_at: datetime
+    decided_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
