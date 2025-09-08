@@ -1,0 +1,35 @@
+[project]
+name = "jigsaw-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.116.1",
+    "pydantic>=2.11.7",
+    "python-dotenv>=1.1.1",
+    "sqlalchemy>=2.0.43",
+    "uvicorn[standard]>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "autoflake>=2.3.1",
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.1",
+]
+
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+skip-string-normalization = false
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["app"]
+combine_as_imports = true
+
