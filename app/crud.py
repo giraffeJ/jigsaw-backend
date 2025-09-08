@@ -1,5 +1,7 @@
-from typing import List, Optional
+from datetime import datetime
+from typing import Dict, List, Literal, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -122,3 +124,124 @@ def search_users_by_criteria(
         query = query.filter(models.User.smoking_status == smoking_status)
 
     return query.offset(skip).limit(limit).all()
+
+
+# --- Templates CRUD ---
+def create_template(db: Session, tmpl: schemas.TemplateCreate) -> models.Template:
+    existing = (
+        db.query(models.Template)
+        .filter(models.Template.key == tmpl.key, models.Template.version == tmpl.version)
+        .first()
+    )
+    if existing:
+        raise ValueError("template with key+version already exists")
+    db_tmpl = models.Template(**tmpl.dict())
+    db.add(db_tmpl)
+    db.commit()
+    db.refresh(db_tmpl)
+    return db_tmpl
+
+
+def update_template(
+    db: Session, key: str, version: int, patch: schemas.TemplateUpdate
+) -> Optional[models.Template]:
+    db_tmpl = (
+        db.query(models.Template)
+        .filter(models.Template.key == key, models.Template.version == version)
+        .first()
+    )
+    if not db_tmpl:
+        return None
+    update_data = patch.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_tmpl, field, value)
+    db.commit()
+    db.refresh(db_tmpl)
+    return db_tmpl
+
+
+def get_template(db: Session, key: str, version: int) -> Optional[models.Template]:
+    return (
+        db.query(models.Template)
+        .filter(models.Template.key == key, models.Template.version == version)
+        .first()
+    )
+
+
+def list_templates(
+    db: Session, active: Optional[bool] = None, skip: int = 0, limit: int = 50
+) -> List[models.Template]:
+    q = db.query(models.Template)
+    if active is not None:
+        q = q.filter(models.Template.is_active == active)
+    return q.offset(skip).limit(limit).all()
+
+
+# --- Plans CRUD ---
+def create_plan(db: Session, plan: schemas.MatchPlanCreate) -> models.MatchPlan:
+    db_plan = models.MatchPlan(**plan.dict())
+    db.add(db_plan)
+    db.commit()
+    db.refresh(db_plan)
+    return db_plan
+
+
+def get_plan(db: Session, plan_id: int) -> Optional[models.MatchPlan]:
+    return db.query(models.MatchPlan).filter(models.MatchPlan.id == plan_id).first()
+
+
+def list_plans(db: Session, skip: int = 0, limit: int = 50) -> List[models.MatchPlan]:
+    return db.query(models.MatchPlan).offset(skip).limit(limit).all()
+
+
+# --- Presentations CRUD ---
+def create_presentation(db: Session, p: schemas.PresentationCreate) -> models.Presentation:
+    data = p.dict()
+    # ensure default outcome/presented_at handled by DB defaults; set explicitly if desired
+    db_p = models.Presentation(**data)
+    db.add(db_p)
+    db.commit()
+    db.refresh(db_p)
+    return db_p
+
+
+def decide_presentation(
+    db: Session, presentation_id: int, decision: schemas.PresentationDecision
+) -> Optional[models.Presentation]:
+    db_p = db.query(models.Presentation).filter(models.Presentation.id == presentation_id).first()
+    if not db_p:
+        return None
+    # map decision string to enum member on models.PresentationOutcome
+    try:
+        enum_member = getattr(models.PresentationOutcome, decision.outcome.upper())
+    except AttributeError:
+        raise ValueError("invalid outcome")
+    db_p.outcome = enum_member
+    db_p.decided_at = datetime.utcnow()
+    db.commit()
+    db.refresh(db_p)
+    return db_p
+
+
+def list_presentations_for_user(
+    db: Session,
+    user_id: int,
+    role: Literal["requester", "candidate"] = "requester",
+    skip: int = 0,
+    limit: int = 50,
+) -> List[models.Presentation]:
+    q = db.query(models.Presentation)
+    if role == "requester":
+        q = q.filter(models.Presentation.requester_id == user_id)
+    else:
+        q = q.filter(models.Presentation.candidate_id == user_id)
+    return q.order_by(models.Presentation.presented_at.desc()).offset(skip).limit(limit).all()
+
+
+def get_presented_counts(db: Session) -> Dict[int, int]:
+    rows = (
+        db.query(models.Presentation.requester_id, func.count(models.Presentation.id))
+        .group_by(models.Presentation.requester_id)
+        .all()
+    )
+    return {r[0]: r[1] for r in rows}

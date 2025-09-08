@@ -1,6 +1,16 @@
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.sql import func
 
 from .db import Base
@@ -84,3 +94,57 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# Presentation outcome enum
+class PresentationOutcome(enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+
+
+class Template(Base):
+    __tablename__ = "templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), nullable=False, comment="템플릿 식별자")
+    version = Column(Integer, nullable=False, default=1, comment="템플릿 버전")
+    locale = Column(String(10), nullable=False, default="ko", comment="언어/로케일")
+    content = Column(Text, nullable=False, comment="템플릿 내용 (마크업/플레인 텍스트)")
+    is_active = Column(Boolean, default=True, nullable=False, comment="활성 여부")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (UniqueConstraint("key", "version", name="uq_template_key_version"),)
+
+
+class MatchPlan(Base):
+    __tablename__ = "plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_by = Column(String(100), nullable=False, comment="운영자 식별자")
+    notes = Column(Text, nullable=True, comment="플랜 관련 메모")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Presentation(Base):
+    __tablename__ = "presentations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    candidate_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    plan_id = Column(Integer, ForeignKey("plans.id"), nullable=True)
+    template_key = Column(String(100), nullable=True)
+    template_version = Column(Integer, nullable=True)
+    rendered_message = Column(Text, nullable=True)
+    outcome = Column(
+        Enum(PresentationOutcome), nullable=False, server_default=PresentationOutcome.PENDING.value
+    )
+    presented_at = Column(DateTime(timezone=True), server_default=func.now())
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "requester_id", "candidate_id", "plan_id", name="uq_present_once_per_plan"
+        ),
+    )

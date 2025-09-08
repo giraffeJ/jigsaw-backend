@@ -1,0 +1,18 @@
+
+==================================== ERRORS ====================================
+____________ ERROR collecting tests/test_templates_presentations.py ____________
+ImportError while importing test module '/home/jeff/git/jigsaw-backend/tests/test_templates_presentations.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../.pyenv/versions/3.12.8/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_templates_presentations.py:18: in <module>
+    import app.main as main
+app/main.py:3: in <module>
+    from fastapi import Depends, FastAPI, HTTPException, Query
+E   ModuleNotFoundError: No module named 'fastapi'
+=========================== short test summary info ============================
+ERROR tests/test_templates_presentations.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.08s
