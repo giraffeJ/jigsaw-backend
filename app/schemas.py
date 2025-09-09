@@ -1,22 +1,24 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 
 # Enums for validation
 class EducationLevel(str, Enum):
-    HIGH_SCHOOL = "고등학교"
-    COLLEGE = "전문대"
-    UNIVERSITY = "대학교"
-    GRADUATE = "대학원"
+    HIGH_SCHOOL = "고졸"
+    JUNIOR_COLLEGE = "초대졸"
+    BACHELORS = "대졸"
+    MASTERS = "석사"
+    DOCTORATE = "박사"
+    OTHER = "기타"
 
 
 class SmokingStatus(str, Enum):
     SMOKER = "흡연"
     NON_SMOKER = "비흡연"
-    OCCASIONAL = "가끔"
+    E_CIGARETTE = "전자담배"
 
 
 class Religion(str, Enum):
@@ -36,6 +38,7 @@ class WorkplaceMatching(str, Enum):
 class UserBase(BaseModel):
     # 기본 정보
     nickname: str = Field(..., description="카카오톡 오픈채팅방 닉네임")
+    profile_url: Optional[str] = Field("", description="프로필 URL (기본 빈 문자열, 운영자가 입력)")
     referrer_info: Optional[str] = Field(None, description="추천인 정보 (이름과 관계)")
 
     # 개인정보 동의
@@ -72,15 +75,23 @@ class UserBase(BaseModel):
 
     # 매칭 조건
     # preferred_age_range를 preferred_age_min / preferred_age_max 정수로 분리
-    preferred_age_min: Optional[int] = Field(None, description="선호 출생연도 최소값 (예: 1993)")
-    preferred_age_max: Optional[int] = Field(None, description="선호 출생연도 최대값 (예: 1998)")
+    preferred_age_min: Optional[int] = Field(
+        None, ge=1980, le=2006, description="선호 출생연도 최소값 (4자리, 1980~2006)"
+    )
+    preferred_age_max: Optional[int] = Field(
+        None, ge=1980, le=2006, description="선호 출생연도 최대값 (4자리, 1980~2006)"
+    )
     workplace_matching: Union[WorkplaceMatching, str] = Field(
         ..., description="같은 직장 매칭 가능 여부 (Enum 또는 자유 입력 허용)"
     )
-    preferred_smoking: Union[SmokingStatus, str] = Field(
-        ..., description="선호 흡연 여부 (Enum 또는 자유 입력 허용)"
+    # 복수 선택 허용: 리스트로 입력 가능 (예: ['비흡연', '전자담배'])
+    preferred_smoking: Optional[List[Union[SmokingStatus, str]]] = Field(
+        None, description="선호 흡연 여부 (복수 선택 가능)"
     )
-    preferred_religion: Optional[str] = Field(None, description="선호 종교")
+    # 복수 선택 허용: 리스트로 입력 가능 (예: ['무교','기독교'])
+    preferred_religion: Optional[List[Union[Religion, str]]] = Field(
+        None, description="선호 종교 (복수 선택 가능)"
+    )
     additional_matching_condition: Optional[str] = Field(None, description="개인적인 추가 매칭조건")
 
 
@@ -92,6 +103,7 @@ class UserUpdate(BaseModel):
     # 기본 정보
     nickname: Optional[str] = None
     referrer_info: Optional[str] = None
+    profile_url: Optional[str] = None
 
     # 공개 인적사항 (본인 확인용 정보는 수정 불가)
     height: Optional[int] = Field(None, ge=140, le=220)
@@ -108,11 +120,11 @@ class UserUpdate(BaseModel):
     additional_info: Optional[str] = None
 
     # 매칭 조건
-    preferred_age_min: Optional[int] = None
-    preferred_age_max: Optional[int] = None
+    preferred_age_min: Optional[int] = Field(None, ge=1980, le=2006)
+    preferred_age_max: Optional[int] = Field(None, ge=1980, le=2006)
     workplace_matching: Optional[Union[WorkplaceMatching, str]] = None
-    preferred_smoking: Optional[Union[SmokingStatus, str]] = None
-    preferred_religion: Optional[str] = None
+    preferred_smoking: Optional[List[Union[SmokingStatus, str]]] = None
+    preferred_religion: Optional[List[Union[Religion, str]]] = None
     additional_matching_condition: Optional[str] = None
 
     is_active: Optional[bool] = None
@@ -123,6 +135,9 @@ class User(UserBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
     class Config:
         from_attributes = True
@@ -208,6 +223,7 @@ class Presentation(PresentationBase):
 class UserPublic(BaseModel):
     id: int
     nickname: str
+    profile_url: Optional[str] = ""
     birth_year: int
     height: int
     residence: str
@@ -245,3 +261,39 @@ class PlanPreviewItem(BaseModel):
 class PlanPreview(BaseModel):
     plan_id: int
     items: List[PlanPreviewItem]
+
+
+# --- Template rendering / present request & responses (Phase 3) ---
+class TemplateRenderRequest(BaseModel):
+    key: str
+    version: int = 1
+    requester_id: Optional[int] = None
+    candidate_id: Optional[int] = None
+    params: Dict[str, Any] = {}
+
+
+class TemplateRenderResponse(BaseModel):
+    content: str
+
+
+class PresentRequest(BaseModel):
+    candidate_id: int
+    template_key: str
+    template_version: int = 1
+    extra_params: Dict[str, Any] = {}
+
+
+class PresentResponse(BaseModel):
+    presentation_id: int
+    rendered_message: str
+    outcome: str
+    presented_at: datetime
+
+
+class PlanPresentQuery(BaseModel):
+    per_user_limit: int = 1
+    cooldown_days: int = 30
+    template_key: str
+    template_version: int = 1
+    dry_run: bool = False
+    extra_params: Dict[str, Any] = {}

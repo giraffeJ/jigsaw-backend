@@ -17,16 +17,18 @@ from .db import Base
 
 
 class EducationLevel(enum.Enum):
-    HIGH_SCHOOL = "고등학교"
-    COLLEGE = "전문대"
-    UNIVERSITY = "대학교"
-    GRADUATE = "대학원"
+    HIGH_SCHOOL = "고졸"
+    JUNIOR_COLLEGE = "초대졸"
+    BACHELORS = "대졸"
+    MASTERS = "석사"
+    DOCTORATE = "박사"
+    OTHER = "기타"
 
 
 class SmokingStatus(enum.Enum):
     SMOKER = "흡연"
     NON_SMOKER = "비흡연"
-    OCCASIONAL = "가끔"
+    E_CIGARETTE = "전자담배"
 
 
 class Religion(enum.Enum):
@@ -49,6 +51,12 @@ class User(Base):
 
     # 기본 정보
     nickname = Column(String(100), nullable=False, comment="카카오톡 오픈채팅방 닉네임")
+    profile_url = Column(
+        String(500),
+        nullable=False,
+        default="",
+        comment="프로필 URL (운영자가 전달할 공개 프로필 URL, 기본 빈 문자열)",
+    )
     referrer_info = Column(Text, nullable=True, comment="추천인 정보 (이름과 관계)")
 
     # 개인정보 동의
@@ -81,13 +89,27 @@ class User(Base):
 
     # 매칭 조건
     # preferred_age_range를 정수형(min/max)으로 분리: birth_year와 동일한 형태의 정수값을 저장합니다.
-    preferred_age_min = Column(Integer, nullable=True, comment="선호 출생연도 최소값 (예: 1994)")
-    preferred_age_max = Column(Integer, nullable=True, comment="선호 출생연도 최대값 (예: 1998)")
+    preferred_age_min = Column(
+        Integer,
+        nullable=True,
+        comment="선호 출생연도 최소값 (예: 1994) - 4자리 연도 (1980~2006 예상)",
+    )
+    preferred_age_max = Column(
+        Integer,
+        nullable=True,
+        comment="선호 출생연도 최대값 (예: 1998) - 4자리 연도 (1980~2006 예상)",
+    )
     workplace_matching = Column(
         Enum(WorkplaceMatching), nullable=False, comment="같은 직장 매칭 가능 여부"
     )
-    preferred_smoking = Column(Enum(SmokingStatus), nullable=False, comment="선호 흡연 여부")
-    preferred_religion = Column(String(200), nullable=True, comment="선호 종교")
+    # 복수 선택 허용: 콤마로 구분된 문자열로 저장 (예: '비흡연,전자담배')
+    preferred_smoking = Column(
+        String(200), nullable=True, comment="선호 흡연 여부 (콤마로 구분된 값, 복수 선택 허용)"
+    )
+    # 복수 선택 허용: 콤마로 구분된 문자열로 저장 (예: '무교,기독교')
+    preferred_religion = Column(
+        String(200), nullable=True, comment="선호 종교 (콤마로 구분된 값, 복수 선택 허용)"
+    )
     additional_matching_condition = Column(Text, nullable=True, comment="개인적인 추가 매칭조건")
 
     # 시스템 필드

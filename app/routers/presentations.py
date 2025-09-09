@@ -55,3 +55,13 @@ def list_presentations(
     return crud.list_presentations_for_user(
         db, user_id=user_id, role=role_val, skip=skip, limit=limit
     )
+
+
+@router.get(
+    "/presentations/pending_messages",
+    response_model=List[schemas.Presentation],
+    summary="관리자가 전달할 대기중인 매칭 문구 목록 (rendered_message 포함)",
+)
+def list_pending_messages(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    items = crud.list_pending_presentations(db, skip=skip, limit=limit)
+    return items
