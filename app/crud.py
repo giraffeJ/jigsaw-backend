@@ -60,31 +60,43 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
 
     # normalize enum-like fields so SQLAlchemy Enum columns receive enum members
     data = user.dict()
-    try:
-        if "education_level" in data and data["education_level"] is not None:
+    # Normalize enum-like fields so SQLAlchemy Enum columns receive enum members
+    if "education_level" in data and data["education_level"] is not None:
+        try:
             data["education_level"] = models.EducationLevel(data["education_level"])
-    except Exception:
-        pass
-    try:
-        if "religion" in data and data["religion"] is not None:
+        except Exception:
+            pass
+    if "religion" in data and data["religion"] is not None:
+        try:
             data["religion"] = models.Religion(data["religion"])
-    except Exception:
-        pass
-    try:
-        if "smoking_status" in data and data["smoking_status"] is not None:
+        except Exception:
+            pass
+    if "smoking_status" in data and data["smoking_status"] is not None:
+        try:
             data["smoking_status"] = models.SmokingStatus(data["smoking_status"])
-    except Exception:
-        pass
-    try:
-        if "workplace_matching" in data and data["workplace_matching"] is not None:
+        except Exception:
+            pass
+    if "workplace_matching" in data and data["workplace_matching"] is not None:
+        try:
             data["workplace_matching"] = models.WorkplaceMatching(data["workplace_matching"])
-    except Exception:
-        pass
-    try:
-        if "preferred_smoking" in data and data["preferred_smoking"] is not None:
-            data["preferred_smoking"] = models.SmokingStatus(data["preferred_smoking"])
-    except Exception:
-        pass
+        except Exception:
+            pass
+
+    # preferred_smoking and preferred_religion may be provided as lists in schemas;
+    # store them as comma-separated strings in the DB (e.g. "비흡연,전자담배")
+    if "preferred_smoking" in data and data["preferred_smoking"] is not None:
+        val = data["preferred_smoking"]
+        if isinstance(val, (list, tuple)):
+            data["preferred_smoking"] = ",".join([str(x).strip() for x in val if x is not None])
+        else:
+            data["preferred_smoking"] = str(val).strip()
+
+    if "preferred_religion" in data and data["preferred_religion"] is not None:
+        val = data["preferred_religion"]
+        if isinstance(val, (list, tuple)):
+            data["preferred_religion"] = ",".join([str(x).strip() for x in val if x is not None])
+        else:
+            data["preferred_religion"] = str(val).strip()
 
     db_user = models.User(**data)
     db.add(db_user)
@@ -122,13 +134,25 @@ def update_user(db: Session, user_id: int, user: schemas.UserUpdate) -> Optional
                 )
             except Exception:
                 pass
+
+        # preferred_smoking/preferred_religion may be provided as lists; convert to CSV strings
         if "preferred_smoking" in update_data and update_data["preferred_smoking"] is not None:
-            try:
-                update_data["preferred_smoking"] = models.SmokingStatus(
-                    update_data["preferred_smoking"]
+            val = update_data["preferred_smoking"]
+            if isinstance(val, (list, tuple)):
+                update_data["preferred_smoking"] = ",".join(
+                    [str(x).strip() for x in val if x is not None]
                 )
-            except Exception:
-                pass
+            else:
+                update_data["preferred_smoking"] = str(val).strip()
+
+        if "preferred_religion" in update_data and update_data["preferred_religion"] is not None:
+            val = update_data["preferred_religion"]
+            if isinstance(val, (list, tuple)):
+                update_data["preferred_religion"] = ",".join(
+                    [str(x).strip() for x in val if x is not None]
+                )
+            else:
+                update_data["preferred_religion"] = str(val).strip()
 
         for field, value in update_data.items():
             setattr(db_user, field, value)
@@ -229,6 +253,11 @@ def get_template(db: Session, key: str, version: int) -> Optional[models.Templat
     )
 
 
+def get_template_by_key_version(db: Session, key: str, version: int) -> Optional[models.Template]:
+    """Alias for compatibility with newer callers."""
+    return get_template(db, key=key, version=version)
+
+
 def list_templates(
     db: Session, active: Optional[bool] = None, skip: int = 0, limit: int = 50
 ) -> List[models.Template]:
@@ -299,6 +328,24 @@ def list_presentations_for_user(
     return q.order_by(models.Presentation.presented_at.desc()).offset(skip).limit(limit).all()
 
 
+def list_pending_presentations(
+    db: Session, skip: int = 0, limit: int = 100
+) -> List[models.Presentation]:
+    """
+    Return presentations that are pending and have a rendered_message (i.e. admin needs to deliver these).
+    Ordered by oldest presented_at first so admin can process in sequence.
+    """
+    q = (
+        db.query(models.Presentation)
+        .filter(
+            models.Presentation.outcome == models.PresentationOutcome.PENDING,
+            models.Presentation.rendered_message != None,
+        )
+        .order_by(models.Presentation.presented_at.asc())
+    )
+    return q.offset(skip).limit(limit).all()
+
+
 def get_presented_counts(db: Session) -> Dict[int, int]:
     rows = (
         db.query(models.Presentation.requester_id, func.count(models.Presentation.id))
@@ -341,3 +388,27 @@ def list_recent_presented_candidate_ids(
         .all()
     )
     return {cid for (cid,) in rows}
+
+
+def create_presentation_with_rendered(
+    db: Session,
+    requester_id: int,
+    candidate_id: int,
+    plan_id: Optional[int],
+    template_key: str,
+    template_version: int,
+    rendered_message: str,
+) -> models.Presentation:
+    """rendered_message 를 가지고 Presentation 레코드 생성 (outcome=pending)."""
+    p = models.Presentation(
+        requester_id=requester_id,
+        candidate_id=candidate_id,
+        plan_id=plan_id,
+        template_key=template_key,
+        template_version=template_version,
+        rendered_message=rendered_message,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p

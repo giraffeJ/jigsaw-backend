@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.db import SessionLocal
 
+# template rendering (public) will use template_engine
+from app.services.template_engine import default_params, render_string
+
 
 def get_db():
     db = SessionLocal()
@@ -15,6 +18,7 @@ def get_db():
         db.close()
 
 
+# Admin router (existing)
 router = APIRouter(prefix="/admin")
 
 
@@ -52,3 +56,30 @@ def patch_template(
     if not tmpl:
         raise HTTPException(status_code=404, detail="Template not found")
     return tmpl
+
+
+# Public router for rendering previews
+public_router = APIRouter()
+
+
+@public_router.post(
+    "/templates/render",
+    response_model=schemas.TemplateRenderResponse,
+    summary="템플릿 렌더링 미리보기",
+)
+def render_template(req: schemas.TemplateRenderRequest, db: Session = Depends(get_db)):
+    tmpl = crud.get_template_by_key_version(db, req.key, req.version)
+    if not tmpl or not tmpl.is_active:
+        raise HTTPException(status_code=404, detail="Template not found")
+    params = dict(req.params or {})
+    if req.requester_id and req.candidate_id:
+        r = crud.get_user(db, req.requester_id)
+        c = crud.get_user(db, req.candidate_id)
+        if not r or not c:
+            raise HTTPException(status_code=404, detail="User not found for render")
+        params = {**default_params(r, c), **params}
+    try:
+        content = render_string(tmpl.content, params)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Render error: {e}")
+    return schemas.TemplateRenderResponse(content=content)

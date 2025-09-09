@@ -254,7 +254,6 @@ def validate_and_prepare_row(row: Dict[str, Any]) -> (Optional[Dict[str, Any]], 
         "religion": models.Religion,
         "smoking_status": models.SmokingStatus,
         "workplace_matching": models.WorkplaceMatching,
-        "preferred_smoking": models.SmokingStatus,
     }
 
     for ef, enum_cls in enum_field_map.items():
@@ -290,7 +289,7 @@ def validate_and_prepare_row(row: Dict[str, Any]) -> (Optional[Dict[str, Any]], 
     # Convert enums to model enums (models.* are enum.Enum classes)
     prepared = user_create.dict()
     # If Pydantic returned Enum members (schemas enums), extract their .value to plain strings
-    for k in ["education_level", "religion", "smoking_status", "workplace_matching", "preferred_smoking"]:
+    for k in ["education_level", "religion", "smoking_status", "workplace_matching"]:
         v = prepared.get(k)
         if v is None:
             continue
@@ -298,20 +297,52 @@ def validate_and_prepare_row(row: Dict[str, Any]) -> (Optional[Dict[str, Any]], 
         if hasattr(v, "value"):
             prepared[k] = v.value
 
-    # education_level, religion, smoking_status, workplace_matching, preferred_smoking
+    # Map single-value enums to model enums
     prepared["education_level"] = normalize_enum(models.EducationLevel, prepared.get("education_level"))
     prepared["religion"] = normalize_enum(models.Religion, prepared.get("religion"))
     prepared["smoking_status"] = normalize_enum(models.SmokingStatus, prepared.get("smoking_status"))
     prepared["workplace_matching"] = normalize_enum(models.WorkplaceMatching, prepared.get("workplace_matching"))
-    prepared["preferred_smoking"] = normalize_enum(models.SmokingStatus, prepared.get("preferred_smoking"))
 
-    # If any required enum conversion failed, return error
-    enum_fields = ["education_level", "religion", "smoking_status", "workplace_matching", "preferred_smoking"]
+    # preferred_smoking: allow multi-value lists or separators -> normalize each token to SmokingStatus and store CSV of values
+    pref_sm_raw = prepared.get("preferred_smoking")
+    if pref_sm_raw:
+        tokens = []
+        if isinstance(pref_sm_raw, (list, tuple)):
+            tokens = [str(t).strip() for t in pref_sm_raw if t is not None]
+        elif isinstance(pref_sm_raw, str) and any(sep in pref_sm_raw for sep in [",", "/", ";", "|"]):
+            tokens = [t.strip() for t in re.split(r"[,/;|]", pref_sm_raw) if t.strip()]
+        elif isinstance(pref_sm_raw, str):
+            tokens = [pref_sm_raw.strip()]
+        norm_vals = []
+        for tok in tokens:
+            mem = normalize_enum(models.SmokingStatus, tok)
+            if mem:
+                norm_vals.append(mem.value)
+        prepared["preferred_smoking"] = ",".join(norm_vals) if norm_vals else None
+
+    # preferred_religion: allow multi-value lists or separators -> normalize each token to Religion and store CSV
+    pref_rel_raw = prepared.get("preferred_religion")
+    if pref_rel_raw:
+        tokens = []
+        if isinstance(pref_rel_raw, (list, tuple)):
+            tokens = [str(t).strip() for t in pref_rel_raw if t is not None]
+        elif isinstance(pref_rel_raw, str) and any(sep in pref_rel_raw for sep in [",", "/", ";", "|"]):
+            tokens = [t.strip() for t in re.split(r"[,/;|]", pref_rel_raw) if t.strip()]
+        elif isinstance(pref_rel_raw, str):
+            tokens = [pref_rel_raw.strip()]
+        norm_vals = []
+        for tok in tokens:
+            mem = normalize_enum(models.Religion, tok)
+            if mem:
+                norm_vals.append(mem.value)
+        prepared["preferred_religion"] = ",".join(norm_vals) if norm_vals else None
+
+    # If any required enum conversion failed, return error for mandatory enums
+    enum_fields = ["education_level", "religion", "smoking_status", "workplace_matching"]
     for ef in enum_fields:
         if getattr(prepared, "get", None) and prepared.get(ef) is None:
             # For required enums, we must ensure presence
-            # Note: prepared[ef] may be None if original value missing or conversion failed
-            if ef in ["education_level", "religion", "smoking_status", "workplace_matching", "preferred_smoking"]:
+            if ef in ["education_level", "religion", "smoking_status", "workplace_matching"]:
                 return None, f"Enum conversion failed or missing for field '{ef}'"
 
     return prepared, None
