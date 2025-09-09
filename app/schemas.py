@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Literal, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -222,3 +222,26 @@ class UserPublic(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Matching response schemas (Phase 2) ---
+class CandidateProposal(BaseModel):
+    candidate_id: int
+    score: float = 0.0
+    reasons: List[str] = []
+    presented_count: int = 0
+    last_presented_at: Optional[datetime] = None
+
+
+class CandidatesResponse(BaseModel):
+    items: List[CandidateProposal]
+
+
+class PlanPreviewItem(BaseModel):
+    user_id: int
+    proposals: List[CandidateProposal]
+
+
+class PlanPreview(BaseModel):
+    plan_id: int
+    items: List[PlanPreviewItem]

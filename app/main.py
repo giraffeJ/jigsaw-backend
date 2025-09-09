@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.routers import plans, presentations, templates
+from app.routers import match, plans, presentations, templates
 
 from . import crud, models, schemas
 from .db import SessionLocal, engine
@@ -130,3 +130,4 @@ def search_users(
 app.include_router(templates.router, tags=["templates"])
 app.include_router(plans.router, tags=["plans"])
 app.include_router(presentations.router, tags=["presentations"])
+app.include_router(match.router, tags=["match"])

@@ -138,7 +138,7 @@ class Presentation(Base):
     template_version = Column(Integer, nullable=True)
     rendered_message = Column(Text, nullable=True)
     outcome = Column(
-        Enum(PresentationOutcome), nullable=False, server_default=PresentationOutcome.PENDING.value
+        Enum(PresentationOutcome), nullable=False, server_default=PresentationOutcome.PENDING.name
     )
     presented_at = Column(DateTime(timezone=True), server_default=func.now())
     decided_at = Column(DateTime(timezone=True), nullable=True)
