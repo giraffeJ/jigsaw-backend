@@ -45,12 +45,15 @@ class WorkplaceMatching(enum.Enum):
 
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "user"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
 
     # 기본 정보
-    nickname = Column(String(100), nullable=False, comment="카카오톡 오픈채팅방 닉네임")
+    nickname = Column(
+        String(128), unique=True, index=True, nullable=False, comment="카카오톡 오픈채팅방 닉네임"
+    )
+    gender = Column(String(1), nullable=True, index=True, comment="성별 (예: 'M'/'F'/'O')")
     profile_url = Column(
         String(500),
         nullable=False,
@@ -89,6 +92,7 @@ class User(Base):
 
     # 매칭 조건
     # preferred_age_range를 정수형(min/max)으로 분리: birth_year와 동일한 형태의 정수값을 저장합니다.
+    preferred_gender = Column(String(16), nullable=True, comment="선호 성별 (예: 'M'/'F'/'O')")
     preferred_age_min = Column(
         Integer,
         nullable=True,
@@ -153,8 +157,8 @@ class Presentation(Base):
     __tablename__ = "presentations"
 
     id = Column(Integer, primary_key=True, index=True)
-    requester_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
-    candidate_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    requester_id = Column(Integer, ForeignKey("user.id"), index=True, nullable=False)
+    candidate_id = Column(Integer, ForeignKey("user.id"), index=True, nullable=False)
     plan_id = Column(Integer, ForeignKey("plans.id"), nullable=True)
     template_key = Column(String(100), nullable=True)
     template_version = Column(Integer, nullable=True)

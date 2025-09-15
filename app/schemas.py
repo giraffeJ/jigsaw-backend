@@ -38,6 +38,7 @@ class WorkplaceMatching(str, Enum):
 class UserBase(BaseModel):
     # 기본 정보
     nickname: str = Field(..., description="카카오톡 오픈채팅방 닉네임")
+    gender: Optional[str] = Field(None, description="성별 (예: 'M', 'F', 'O')")
     profile_url: Optional[str] = Field("", description="프로필 URL (기본 빈 문자열, 운영자가 입력)")
     referrer_info: Optional[str] = Field(None, description="추천인 정보 (이름과 관계)")
 
@@ -75,6 +76,7 @@ class UserBase(BaseModel):
 
     # 매칭 조건
     # preferred_age_range를 preferred_age_min / preferred_age_max 정수로 분리
+    preferred_gender: Optional[str] = Field(None, description="선호 성별 (예: 'M','F','O')")
     preferred_age_min: Optional[int] = Field(
         None, ge=1980, le=2006, description="선호 출생연도 최소값 (4자리, 1980~2006)"
     )
@@ -102,6 +104,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     # 기본 정보
     nickname: Optional[str] = None
+    gender: Optional[str] = None
     referrer_info: Optional[str] = None
     profile_url: Optional[str] = None
 
@@ -223,6 +226,7 @@ class Presentation(PresentationBase):
 class UserPublic(BaseModel):
     id: int
     nickname: str
+    gender: Optional[str] = None
     profile_url: Optional[str] = ""
     birth_year: int
     height: int

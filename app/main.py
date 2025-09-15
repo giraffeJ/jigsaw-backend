@@ -3,10 +3,10 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.routers import match, plans, present, presentations, templates
+from app.db import engine, get_db
+from app.routers import history_router, match_router, template_router, user_router
 
 from . import crud, models, schemas
-from .db import SessionLocal, engine
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -16,13 +16,7 @@ app = FastAPI(
 )
 
 
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Dependency to get DB session (provided by app.db.get_db)
 
 
 @app.get("/")
@@ -126,12 +120,8 @@ def search_users(
     return users
 
 
-# Include admin routers (templates, plans, presentations)
-app.include_router(templates.router, tags=["templates"])
-# public template render endpoint
-app.include_router(templates.public_router, tags=["templates-public"])
-app.include_router(plans.router, tags=["plans"])
-app.include_router(presentations.router, tags=["presentations"])
-# present endpoints (single + batch)
-app.include_router(present.router, tags=["present"])
-app.include_router(match.router, tags=["match"])
+# Include routers
+app.include_router(template_router.router, tags=["template"])
+app.include_router(user_router.router, tags=["user"])
+app.include_router(history_router.router, tags=["history"])
+app.include_router(match_router.router, tags=["match"])

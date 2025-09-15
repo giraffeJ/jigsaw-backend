@@ -254,7 +254,12 @@ def get_template(db: Session, key: str, version: int) -> Optional[models.Templat
 
 
 def get_template_by_key_version(db: Session, key: str, version: int) -> Optional[models.Template]:
-    """Alias for compatibility with newer callers."""
+    """하위호환을 위한 alias 함수.
+
+    설명:
+        구 버전 호출자와의 호환성을 위해 제공되는 간단한 래퍼입니다.
+        내부적으로 :func:`get_template`을 호출합니다.
+    """
     return get_template(db, key=key, version=version)
 
 
@@ -331,9 +336,14 @@ def list_presentations_for_user(
 def list_pending_presentations(
     db: Session, skip: int = 0, limit: int = 100
 ) -> List[models.Presentation]:
-    """
-    Return presentations that are pending and have a rendered_message (i.e. admin needs to deliver these).
-    Ordered by oldest presented_at first so admin can process in sequence.
+    """전달 대기중이며 렌더된 메시지를 가진 Presentation 목록을 반환합니다.
+
+    설명:
+        관리자(운영자)가 실제로 전달해야 하는 항목들을 가져오기 위한 헬퍼입니다.
+        결과는 presented_at이 오래된 순으로 정렬되어 반환됩니다.
+
+    Returns:
+        List[models.Presentation]: 전달 대기중인 Presentation 목록 (rendered_message가 존재하고 outcome이 PENDING인 항목).
     """
     q = (
         db.query(models.Presentation)

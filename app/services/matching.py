@@ -18,14 +18,12 @@ def _in_range(v: Optional[int], lo: Optional[int], hi: Optional[int]) -> bool:
 
 
 def _satisfy_preference(a: models.User, b: models.User) -> Tuple[bool, List[str]]:
-    """
-    Check whether user 'b' satisfies user 'a' preferences.
+    """사용자 'b'가 사용자 'a'의 선호를 만족하는지 검사합니다.
 
-    Notes:
-    - preferred_age_min/max are birth years. If both provided and min>max, swap them.
-    - preferred_smoking / preferred_religion are stored as comma-separated strings in DB (e.g. "비흡연,전자담배").
-      This function parses them into sets and checks membership.
-    - Workplace same-company determination uses a normalization + substring/token heuristics.
+    설명:
+        - preferred_age_min / preferred_age_max는 출생연도입니다. 둘 다 존재하고 min > max이면 서로 교환합니다.
+        - preferred_smoking / preferred_religion은 DB에 쉼표로 저장될 수 있으며, 이 함수는 이를 파싱해 집합으로 검사합니다.
+        - 같은 직장 판정은 normalize_workplace와 부분 문자열/토큰 교집합 휴리스틱을 사용합니다.
     """
     reasons: List[str] = []
     ok = True
